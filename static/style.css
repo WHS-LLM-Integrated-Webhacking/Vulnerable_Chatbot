@@ -1,0 +1,52 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+
+.container {
+    width: 800px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+.filters, .tags {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+}
+
+.filters button, .tags span {
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    cursor: pointer;
+}
+
+.job-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 700px; /* 최대 높이 설정 */
+    overflow-y: auto;
+}
+
+.job-card {
+    background: #e5e5ea;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 10px; /* margin을 줄여서 크기 조정 */
+    font-size: 14px; /* 글자 크기 조정 */
+}
+
