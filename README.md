@@ -71,7 +71,7 @@ Insecure output handling refers to the improper processing of LLM-generated data
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/yourusername/Vulnerable_Chatbot.git
+   git clone https://github.com/WHS-LLM-Integrated-Webhacking/Vulnerable_Chatbot.git
    cd Vulnerable_Chatbot
    ```
 
