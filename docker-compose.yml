@@ -13,7 +13,9 @@ services:
       FLASK_APP: app
       FLASK_RUN_HOST: 0.0.0.0
       OPENAI_API_KEY: "your_openai_api_key"
-      OPENAI_MODEL_NAME: "gpt-3.5-turbo"
+      OPENAI_MODEL_NAME: "your_model_name"
+      EMAIL: "your_gmail_address"
+      EMAIL_PASSWORD: "gmail_app_password"
       # Do not edit
       INTERNAL_API_KEY: "test_api_key"
       FLAG: "Flag{Insecure_Output_Handling}"

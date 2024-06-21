@@ -4,11 +4,18 @@ import logging
 import pandas as pd
 import openai
 import requests
+import smtplib
+import imaplib
+import email
+from email.header import decode_header
+from email.mime.text import MIMEText
 from flask import Flask, request, render_template, jsonify, abort, redirect, url_for
 from llama_index.experimental.query_engine.pandas.pandas_query_engine import PandasQueryEngine
 from llama_index.llms.openai import OpenAI
 from llama_index.core import SQLDatabase
 from llama_index.core.query_engine import NLSQLTableQueryEngine
+from llama_index.core.agent import ReActAgent
+from llama_index.core.tools import BaseTool, FunctionTool
 from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer, insert
 from sqlalchemy.orm import sessionmaker
 from bs4 import BeautifulSoup
@@ -19,6 +26,8 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL_NAME')
 FLAG = os.getenv("FLAG")
+email_user = os.getenv('EMAIL')
+email_pass = os.getenv('EMAIL_PASSWORD')
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -139,6 +148,78 @@ def summarize_content(content):
         print(f"Error summarizing content: {e}")
         return "Failed to summarize the content."
 
+def send_email(receiver_email:str, body:str, subject:str):
+    """send email to receiver email using subject, body"""
+    smtp = smtplib.SMTP('smtp.gmail.com', 587)
+    smtp.ehlo()
+    smtp.starttls()
+    smtp.login(email_user, email_pass)
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    smtp.sendmail(email_user, receiver_email, msg.as_string())
+    smtp.quit()
+
+def decode_mime_words(s):
+    return ''.join(
+        word.decode(encoding or 'utf-8') if isinstance(word, bytes) else word
+        for word, encoding in decode_header(s)
+    )
+
+def read_email(idx: int) -> (str,str,str): 
+    """read idx-th email and returns the result(subject, from, body). latest email idx is -1"""
+    subject = ''
+    body = ''
+    from_ = ''
+    # IMAP 서버에 연결
+    imap_server = "imap.gmail.com"
+    mail = imaplib.IMAP4_SSL(imap_server)
+    mail.login(email_user, email_pass)
+
+    # 받은 편지함 선택
+    mail.select("inbox")
+
+    # 최신 이메일 검색
+    status, messages = mail.search(None, 'ALL')
+    mail_ids = messages[0].split()
+    email_id = mail_ids[idx]  # 가장 최신 이메일 ID
+
+    # 최신 이메일 가져오기
+    status, msg_data = mail.fetch(email_id, "(RFC822)")
+    for response_part in msg_data:
+        if isinstance(response_part, tuple):
+            msg = email.message_from_bytes(response_part[1])
+            subject, encoding = decode_header(msg["Subject"])[0]
+            if isinstance(subject, bytes):
+                subject = subject.decode(encoding if encoding else "utf-8")
+            from_ = decode_mime_words(msg.get("From"))
+
+            if msg.is_multipart():
+                for part in msg.walk():
+                    content_type = part.get_content_type()
+                    content_disposition = str(part.get("Content-Disposition"))
+
+                    if "attachment" not in content_disposition:
+                        payload = part.get_payload(decode=True)
+                        if payload is not None:
+                            body = payload.decode()
+                            break
+            else:
+                payload = msg.get_payload(decode=True)
+                if payload is not None:
+                    body = payload.decode()
+
+    # 서버 연결 종료
+    mail.close()
+    mail.logout()
+    return subject, from_, body
+
+# agent setting
+read_email_tool = FunctionTool.from_defaults(fn=read_email)
+send_email_tool = FunctionTool.from_defaults(fn=send_email)
+summarize_content_tool = FunctionTool.from_defaults(fn=summarize_content)
+
+agent = ReActAgent.from_tools([read_email_tool,send_email_tool],llm=llm, verbose=True) 
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -177,6 +258,14 @@ def query():
             return jsonify({"response": "Failed to retrieve the page content."})
         summary = summarize_content(page_content)
         return jsonify({"response": summary})
+    elif selected_function == "Indirect Prompt Injection":
+        try:
+            response = agent.chat(user_query)
+            agent.reset()
+            response_str = response.response
+        except Exception as e:
+            response_str =  str(e)
+        return jsonify({"response": response_str})
     else:
         return jsonify({"response": "Invalid function selected."})
 
